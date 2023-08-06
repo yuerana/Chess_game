@@ -64,7 +64,7 @@ class ChessGame:
                     game_render.render_regret_button(pygame.MOUSEBUTTONDOWN)
                 
                 if event.type == pygame.KEYDOWN:
-                    if event.key == pygame.K_SPACE:  # 检查是否按下了Esc键
+                    if event.key == pygame.K_SPACE:
                         game_logic.space()
 
             past_time = self.clock.tick(self.fps)    
