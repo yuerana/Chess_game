@@ -2,7 +2,7 @@ import pygame, sys
 from abc import ABC, abstractmethod
 import copy
 import logging
-logging.basicConfig(level=logging.DEBUG,format='%(asctime)s - %(levelname)s - %(message)s')
+logging.basicConfig(level=logging.DEBUG,format='%(asctime)s - %(levelname)s - %(message)s')               # log
 
 class ChessGame: 
     title = "ChessGame"
@@ -38,7 +38,7 @@ class ChessGame:
     def run(self):
         running = True
         #----------------------------------Initialization-------------------------------
-        current_player = 'black'       # start from black
+        current_player = 'white'       # start from white
         time_left = self.turn_time
         self.cell_size = self.width // 9        # chessboard cells size
         self.user_space = 100                   # UI space
@@ -58,21 +58,17 @@ class ChessGame:
                     mouse_pos = pygame.mouse.get_pos()
                     clicked_row = (self.mouse_pos[1] - self.user_space - self.label_width) // int(self.cell_size)
                     clicked_col = (self.mouse_pos[0] - self.label_width) // int(self.cell_size)
-                    clicked_position = (clicked_row, clicked_col)
-                    game_logic.handle_click(clicked_position)
-                    game_render.render_promote_button(pygame.MOUSEBUTTONDOWN)
-                    game_render.render_regret_button(pygame.MOUSEBUTTONDOWN)
-                
-                if event.type == pygame.KEYDOWN:
-                    if event.key == pygame.K_SPACE:
-                        game_logic.space()
+                    clicked_position = (int(clicked_row), int(clicked_col))                                           # get clicked position of chessboard ( row, col )
+                    game_logic.En_passant(clicked_position)                                                           # liasten to the En passant event
+                    game_logic.handle_click(clicked_position)                                                         # normal click operation
+                    game_render.render_promote_button(pygame.MOUSEBUTTONDOWN)                                         # render promote botton
+                    game_render.render_regret_button(pygame.MOUSEBUTTONDOWN)                                          # render regret button
 
             past_time = self.clock.tick(self.fps)    
             game_logic.update_timer(past_time)      # time update
-            game_render.render()   # Render
+            game_render.render()                    # Render interface and game
 
             pygame.display.flip()
-
         pygame.quit()
 
 class Initial_interface:
@@ -95,11 +91,11 @@ class Initial_interface:
         text_rect = text.get_rect(center=(self.width // 2, self.height // 2 - 50))
         self.window.blit(text, text_rect)
 
-    def draw_start_button(self):       # 始まりボタン
+    def draw_start_button(self):
         pygame.draw.rect(self.window, (200, 200, 200), self.button_rect) 
         self.window.blit(self.button_text, self.button_rect.move(self.padding, self.padding))
 
-    def if_start(self, mouse_pos):
+    def if_start(self, mouse_pos):  
         return self.button_rect.collidepoint(mouse_pos)
 
 class Game_renderer:
@@ -114,8 +110,8 @@ class Game_renderer:
         self.board_height = height - self.user_space*2 - self.label_width*2
         self.game_logic = game_logic            # game state
         self.buttons = None
-        self.UI_y1 = self.user_space/2
-        self.UI_y2 = self.height - self.user_space // 2
+        self.UI_y2 = self.user_space/2
+        self.UI_y1 = self.height - self.user_space // 2
 
         self.chessboard_coordinate = {(x, y): None for x in range(8) for y in range(8)}  # Center coordinates for each cell
         for row in range(8):
@@ -124,12 +120,12 @@ class Game_renderer:
                 y = self.user_space + self.label_width + (row + 0.5) * self.cell_size
                 self.chessboard_coordinate[(row, col)] = (x, y)
 
-    def render(self):
+    def render(self):                           # render  ( timer | label | board | pieces | movable route | regret button | check warn | promote button )
         self.render_timer()
         self.render_label()
         self.render_board()
         self.render_pieces()
-        self.render_movable_route()
+        self.render_movable_route()             # render movable route (when piece be selected)
         self.render_regret_button(None)
         self.render_check()
         self.render_promote_button(None)
@@ -143,8 +139,8 @@ class Game_renderer:
         font = pygame.font.Font(None, 36)
         pygame.draw.rect(self.window, (0, 0, 0), (0, 0, self.width, self.user_space))
         pygame.draw.rect(self.window, (255, 255, 255), (0, self.height-self.user_space, self.width, self.user_space))
-        timer_text1 = pygame.font.Font(None, 36).render(f"Time Left: {int(self.game_logic.time_left)}",True,(255, 255, 255))
-        timer_text2 = pygame.font.Font(None, 36).render(f"Time Left: {int(self.game_logic.time_left)}",True,(0, 0, 0))
+        timer_text1 = pygame.font.Font(None, 36).render(f"Time Left: {int(self.game_logic.time_left)}",True,(0, 0, 0))
+        timer_text2 = pygame.font.Font(None, 36).render(f"Time Left: {int(self.game_logic.time_left)}",True,(255, 255, 255))
         text_rect1 = timer_text1.get_rect(center=(x1, y1))
         text_rect2 = timer_text2.get_rect(center=(x2, y2))
         if self.game_logic.current_player == 'white':
@@ -204,7 +200,7 @@ class Game_renderer:
                     if movable_list[row][col] == True:
                         pygame.draw.circle(self.window, (160, 14, 14), self.chessboard_coordinate[(row, col)], 5)
 
-    def render_regret_button(self, event_type):
+    def render_regret_button(self, event_type):     # regret button
         button_width = 60
         button_height = 40
         x1 = self.width // 2 - button_width
@@ -224,33 +220,32 @@ class Game_renderer:
                         button.click(self.game_logic)
                         return
 
-    def render_check(self):
+    def render_check(self):         # check warn
         text_size = 40
-        x1 = self.width // 2 + text_size // 2
-        y1 = self.UI_y1
-        x2 = self.width // 2 - text_size //2
-        y2 = self.UI_y2
+        x1 = self.width // 2 - text_size //2
+        y1 = self.UI_y2
+        x2 = self.width // 2 + text_size // 2
+        y2 = self.UI_y1
         font = pygame.font.Font(None, text_size)
-        check_text1 = pygame.font.Font(None, 36).render(f"check!",True,(255, 255, 255))
-        check_text2 = pygame.font.Font(None, 36).render(f"check!",True,(0, 0, 0))
-        text_rect1 = check_text1.get_rect(center=(x1, y1))
-        text_rect2 = check_text2.get_rect(center=(x2, y2))
+        check_text = pygame.font.Font(None, 36).render(f"checked!!!",True,(252, 85, 49))
+        text_rect1 = check_text.get_rect(center=(x1, y1))
+        text_rect2 = check_text.get_rect(center=(x2, y2))
         if self.game_logic.check[0] == True:
-            self.window.blit(check_text1, text_rect1)
+            self.window.blit(check_text, text_rect1)
         if self.game_logic.check[1] == True:
-            self.window.blit(check_text2, text_rect2)
+            self.window.blit(check_text, text_rect2)
 
     def render_promote_button(self, event_type):        # pawn promotion button
         if self.game_logic.promote_piece is not None:
             button_width = 60
             button_height = 40
             button_gap = 20
-            if self.game_logic.promote_piece.color == 'black':
+            if self.game_logic.promote_piece.color == 'white':
                 self.button_x = self.width * 3 // 4
-                self.button_y = (self.user_space - button_height) // 2
-            else:
-                self.button_x = self.width // 6
                 self.button_y = self.user_space + self.label_width*2 + self.board_height + (self.user_space - button_height) // 2
+            elif self.game_logic.promote_piece.color == 'black':
+                self.button_x = self.width // 6
+                self.button_y = (self.user_space - button_height) // 2
 
             self.promote_buttons = [
                 Promote_button(self.button_x - 1.5 * button_width - 0.5 * button_gap, self.button_y, button_width, button_height, 'Rook'),
@@ -310,6 +305,7 @@ class Promote_button(Button):
         game_logic.selected_piece = None
         game_logic.is_pawn_event = False
         game_logic.reverse_player()
+        game_logic.update_state()
         game_logic.if_check()
         game_logic.into_history_stack()
 
@@ -322,10 +318,10 @@ class Regret_button(Button):
             logging.debug("Attempting to handle a regret action")
             if len(game_logic.history) > 1:                               # keep initial state
                 logging.debug("History stack has more than one state")
+                print("悔棋")
                 game_logic.history.pop()                                  # pop current state
-                previous_chessboard, previous_round, previous_player, previous_promote_piece, previous_passant_piece, previous_is_pawn_event, previous_check, previous_king = copy.deepcopy(game_logic.history[-1])  # 一つ前の状態を得る
+                previous_chessboard, previous_player, previous_promote_piece, previous_passant_piece, previous_is_pawn_event, previous_check = copy.deepcopy(game_logic.history[-1])  # get previous state's copy
                 game_logic.chessboard = previous_chessboard
-                game_logic.round = previous_round
                 game_logic.current_player = previous_player
                 game_logic.promote_piece = previous_promote_piece
                 game_logic.passant_piece = previous_passant_piece
@@ -335,70 +331,98 @@ class Regret_button(Button):
                     game_logic.time_left = game_logic.pawn_time
                 game_logic.is_pawn_event = previous_is_pawn_event
                 game_logic.check = previous_check
-                game_logic.king = previous_king
                 game_logic.selected_piece = None
+                game_logic.update_state()
                 game_logic.if_check()
                 logging.info("Successfully restored the previous game state")
             else:
                 logging.warning("Only the initial state remains in the history stack")
         except Exception as e:
             logging.error(f"Error occurred while handling regret action: {e}")
-        
 
 class Game_logic:
     def __init__(self, selected_piece, current_player, time_left, turn_time):
         self.chessboard = {(row, col): None for row in range(8) for col in range(8)}
-        self.round = 0                          # game round (number of turn)
         self.selected_piece = selected_piece
         self.current_player = current_player
         self.time_left = time_left
         self.turn_time = turn_time
         self.pawn_time = 10
         self.promote_piece = None
-        self.passant_piece = None
+        self.passant_piece = {'left': None, 'right': None} 
         self.is_pawn_event = False
         self.check = [False, False]             #(black, white)
         self.initialize_pieces()
-        self.king = {'black': None, 'white': None}                   # (black_king, white_king)
-        self.history = []
+        self.king = {'black': None, 'white': None}                   # (black_king,  white_king)
+        self.lose = {'black': False, 'white': False}                 # if lose
+        self.history = []                       # stack
         self.if_check()
         self.into_history_stack()               # push initial state
-        self.space_e = False
 
     def initialize_pieces(self):     # initial position for pieces
-        self.chessboard[(0, 0)] = Rook('white', (0, 0), self.chessboard)
-        self.chessboard[(0, 1)] = Knight('white', (0, 1), self.chessboard)
-        self.chessboard[(0, 2)] = Bishop('white', (0, 2), self.chessboard)
-        self.chessboard[(0, 3)] = King('white', (0, 3), self.chessboard)
-        self.chessboard[(0, 4)] = Queen('white', (0, 4), self.chessboard)
-        self.chessboard[(0, 5)] = Bishop('white', (0, 5), self.chessboard)
-        self.chessboard[(0, 6)] = Knight('white', (0, 6), self.chessboard)
-        self.chessboard[(0, 7)] = Rook('white', (0, 7), self.chessboard)
+        self.chessboard[(0, 0)] = Rook('black', (0, 0), self.chessboard)
+        self.chessboard[(0, 1)] = Knight('black', (0, 1), self.chessboard)
+        self.chessboard[(0, 2)] = Bishop('black', (0, 2), self.chessboard)
+        self.chessboard[(0, 3)] = King('black', (0, 3), self.chessboard)
+        self.chessboard[(0, 4)] = Queen('black', (0, 4), self.chessboard)
+        self.chessboard[(0, 5)] = Bishop('black', (0, 5), self.chessboard)
+        self.chessboard[(0, 6)] = Knight('black', (0, 6), self.chessboard)
+        self.chessboard[(0, 7)] = Rook('black', (0, 7), self.chessboard)
 
-        self.chessboard[(7, 0)] = Rook('black', (7, 0), self.chessboard)
-        self.chessboard[(7, 1)] = Knight('black', (7, 1), self.chessboard)
-        self.chessboard[(7, 2)] = Bishop('black', (7, 2), self.chessboard)
-        self.chessboard[(7, 3)] = King('black', (7, 3), self.chessboard)
-        self.chessboard[(7, 4)] = Queen('black', (7, 4), self.chessboard)
-        self.chessboard[(7, 5)] = Bishop('black', (7, 5), self.chessboard)
-        self.chessboard[(7, 6)] = Knight('black', (7, 6), self.chessboard)
-        self.chessboard[(7, 7)] = Rook('black', (7, 7), self.chessboard)
+        self.chessboard[(7, 0)] = Rook('white', (7, 0), self.chessboard)
+        self.chessboard[(7, 1)] = Knight('white', (7, 1), self.chessboard)
+        self.chessboard[(7, 2)] = Bishop('white', (7, 2), self.chessboard)
+        self.chessboard[(7, 3)] = King('white', (7, 3), self.chessboard)
+        self.chessboard[(7, 4)] = Queen('white', (7, 4), self.chessboard)
+        self.chessboard[(7, 5)] = Bishop('white', (7, 5), self.chessboard)
+        self.chessboard[(7, 6)] = Knight('white', (7, 6), self.chessboard)
+        self.chessboard[(7, 7)] = Rook('white', (7, 7), self.chessboard)
 
         for col in range(8):
-            self.chessboard[(1, col)] = Pawn('white', (1, col), self.chessboard)
-            self.chessboard[(6, col)] = Pawn('black', (6, col), self.chessboard)
+            self.chessboard[(1, col)] = Pawn('black', (1, col), self.chessboard)
+            self.chessboard[(6, col)] = Pawn('white', (6, col), self.chessboard)
 
     def into_history_stack(self):               # always keep the initial state and push state per motion
-        current_state = (copy.deepcopy(self.chessboard), self.round, self.current_player, copy.deepcopy(self.promote_piece), copy.deepcopy(self.passant_piece), self.is_pawn_event, self.check, self.king)
+        current_state = (copy.deepcopy(self.chessboard), self.current_player, copy.deepcopy(self.promote_piece), copy.deepcopy(self.passant_piece), self.is_pawn_event, copy.deepcopy(self.check))
         self.history.append(current_state)
+#---------------------------------------------for debug----------------------------------------------
+    # def print_state(self):
+    #     i = 1
+    #     while i <= len(self.history):
+    #         print("Stack", -i, "  ", len(self.history))
+    #         self.print_board()
+    #         i += 1
 
-    def update_state(self):
-        self.round += 1
+    # def print_board(self):
+    #     for row in range(8):
+    #         for col in range(8):
+    #             piece = self.chessboard[(row, col)]
+    #             if piece is None:
+    #                 print('..', end=' ')
+    #             else:
+    #                 if isinstance(piece, King):
+    #                     print('Ki', end=' ')
+    #                 if isinstance(piece, Queen):
+    #                     print('Qu', end=' ')
+    #                 if isinstance(piece, Rook):
+    #                     print('Ro', end=' ')
+    #                 if isinstance(piece, Bishop):
+    #                     print('Bi', end=' ')
+    #                 if isinstance(piece, Knight):
+    #                     print('Kn', end=' ')
+    #                 if isinstance(piece, Pawn):
+    #                     print('Pa', end=' ')
+    #         print()
+
+    def update_state(self):            # update movable_list, 
         for row in range(8):
             for col in range(8):
                 piece = self.chessboard[(row, col)]
                 if piece:
+                    piece.chessboard = self.chessboard
                     piece.update_movable_list()
+                    if isinstance(piece, Pawn):
+                        piece.image = pygame.image.load(f"game\image\{piece.color}_pawn.png")
 
     def update_timer(self, past_time):
         self.time_left -= past_time / 1000      # calculate time left
@@ -408,6 +432,7 @@ class Game_logic:
             self.selected_piece = None
             self.reverse_player()
             self.is_pawn_event = False
+            self.into_history_stack()
 
     def reverse_player(self):
         if self.current_player == 'black':
@@ -416,25 +441,34 @@ class Game_logic:
             self.current_player = 'black'
         self.time_left = self.turn_time
 
-    def if_pawn_time(self, color, event):
+    def is_pawn_time(self, color, event):
         if event == 'promotion':
-            if self.is_pawn_event == True:
-                self.current_player = color
-                self.time_left = self.pawn_time
-                self.selected_piece = None
+            self.is_pawn_event = True
+            self.promote_piece.image = pygame.image.load(f"game\image\pawn_event.png")
+            self.current_player = color
+            self.time_left = self.pawn_time
+            self.selected_piece = None
         elif event == 'En passant':
-            pass
+            self.is_pawn_event = True
+            if self.passant_piece['left']:
+                self.passant_piece['left'].image = pygame.image.load(f"game\image\pawn_event.png")
+            if self.passant_piece['right']:
+                self.passant_piece['right'].image = pygame.image.load(f"game\image\pawn_event.png")
+            self.current_player = color
+            self.time_left = self.pawn_time
+            self.selected_piece = None
 
-    def move_piece(self, clicked_position):
-        self.chessboard[self.selected_piece.position] = None
-        self.selected_piece.position = clicked_position
+    def move_piece(self, selected_piece, clicked_position):
+        self.chessboard[selected_piece.position] = None
+        selected_piece.position = clicked_position
         if self.king['black'] == self.chessboard[clicked_position]:
             self.king['black'] = None
             self.check[0] = None
         elif self.king['white'] == self.chessboard[clicked_position]:
             self.king['white'] = None
             self.check[1] = None
-        self.chessboard[clicked_position] = self.selected_piece
+        self.chessboard[clicked_position] = selected_piece
+        self.update_state()
 
     def handle_click(self, clicked_position):
         if 0 <= clicked_position[0] < 8 and 0 <= clicked_position[1] < 8:
@@ -451,18 +485,26 @@ class Game_logic:
                     self.selected_position = clicked_position
                 # clicked the cell which on selected piece's movable route 
                 elif self.is_pawn_event == False and self.selected_piece.movable_list[int(clicked_position[0])][int(clicked_position[1])] == 1:
-                    self.move_piece(clicked_position)       # move
-                    self.update_state()
+                    passant_judge  = abs(self.selected_position[0] - clicked_position[0]) # if pawn move 2cells -> judge En passant
+                    self.move_piece(self.selected_piece, clicked_position)       # move
                     if isinstance(self.selected_piece, Pawn):
                         pawn = self.selected_piece
                         if pawn.first_move == True: # pawn first step
+                            if passant_judge == 2:       # pawn Enpassant
+                                row = pawn.position[0]
+                                col = pawn.position[1]
+                                if 0 <= col - 1 <= 7 and isinstance(self.chessboard[(row, col - 1)], Pawn) and self.chessboard[(row, col - 1)].color != self.current_player: # if En passant posible and opponent's piece
+                                    self.passant_piece['left'] = self.chessboard[(row, col - 1)]
+                                if 0 <= col + 1 <= 7 and isinstance(self.chessboard[(row, col + 1)], Pawn) and self.chessboard[(row, col + 1)].color != self.current_player: # if En passant posible and opponent's piece
+                                    self.passant_piece['right'] = self.chessboard[(row, col + 1)]
+                                if self.passant_piece['left']:
+                                    self.is_pawn_time(self.passant_piece['left'].color, 'En passant')
+                                elif self.passant_piece['right']:
+                                    self.is_pawn_time(self.passant_piece['right'].color, 'En passant')
                             pawn.first_move = False
-                            if False:       # pawn Enpassant
-                                pass 
-                        if pawn.color == 'black' and pawn.position[0] == 0 or pawn.color == 'white' and pawn.position[0] == 7: # pawn promotion
+                        if pawn.color == 'white' and pawn.position[0] == 0 or pawn.color == 'black' and pawn.position[0] == 7: # pawn promotion
                             self.promote_piece = pawn
-                            self.is_pawn_event = True
-                            self.if_pawn_time(self.promote_piece.color, 'promotion')
+                            self.is_pawn_time(self.promote_piece.color, 'promotion')
                         else:
                             self.reverse_player()
                     else:
@@ -472,26 +514,49 @@ class Game_logic:
                     self.selected_piece = None
                     self.selected_position = None
 
+    def En_passant(self, clicked_position):
+            goal_position = None
+            if self.is_pawn_event == True:
+                if 0 <= clicked_position[0] < 8 and 0 <= clicked_position[1] < 8:
+                    clicked_piece = self.chessboard[clicked_position]
+                    if self.passant_piece['left']:
+                        if clicked_piece == self.passant_piece['left']:
+                            if clicked_piece.color == 'white':
+                                goal_position = (clicked_position[0] - 1, clicked_position[1] + 1)
+                            elif clicked_piece.color == 'black':
+                                goal_position = (clicked_position[0] + 1, clicked_position[1] + 1)
+                    if self.passant_piece['right']:
+                        if clicked_piece == self.passant_piece['right']:
+                            if clicked_piece.color == 'white':
+                                goal_position = (clicked_position[0] - 1, clicked_position[1] - 1)
+                            elif clicked_piece.color == 'black':
+                                goal_position = (clicked_position[0] + 1, clicked_position[1] - 1)
+                    if(goal_position):
+                        self.move_piece(clicked_piece, goal_position)
+                    self.is_pawn_event = False
+                    self.passant_piece = {'left': None, 'right': None}
+                    self.update_state()
+                    self.if_check()
+                    self.into_history_stack()           # push the state after movement
+
     def update_real_time_king(self):          # get real time king (black_king, white_king)
         for row in range(8):
             for col in range(8):
                 piece = self.chessboard[(row, col)]
-                if self.king['black'] and self.king['white']:
-                    break
-                if  piece and isinstance(piece, King):
-                    self.king[piece.color] = piece
-
+                if  piece and isinstance(piece, King):   # find each players king
+                    if piece.color == 'black':
+                        self.king['black'] = piece
+                    elif piece.color == 'white':
+                        self.king['white'] = piece
+    
     def if_check(self):
         self.update_real_time_king()
-        if self.king['black'] and self.king['white']:
-            self.check[0] = self.if_be_checked('black')
-            self.check[1] = self.if_be_checked('white')
-        elif not self.king['black']:
-            pass        # black loss
-        elif not self.king['white']:
-            pass        # white loss
+        print()
+        self.check[0] = self.if_be_checked('black')
+        self.check[1] = self.if_be_checked('white')
     
     def if_be_checked(self, player):
+        print(player)
         for row in range(8):
             for col in range(8):
                 piece = self.chessboard[(row, col)]
@@ -499,14 +564,11 @@ class Game_logic:
                     for x in range(8):
                         for y in range(8):
                             if piece.movable_list[x][y] == True:     # movable position
-                                if self.chessboard[(x, y)] == self.king[player]:        # if king on the movable position
+                                if isinstance(piece, Bishop):
+                                    print(piece, piece.position, (x, y))
+                                if self.chessboard[(x, y)] and self.chessboard[(x, y)] == self.king[player]:        # if king on the movable position
                                     return True
-        return False                  # for all pieces, can't be checked
-    
-    def space(self):
-        self.space_e = True
-        self.if_check()
-        #print(self.selected_piece.movable_list)
+        return False                  # can't be checked by all opponent's pieces
 
 class Piece(ABC):
     def __init__(self, color, position, chessboard):
@@ -543,9 +605,6 @@ class King(Piece):
         image_path = f"game\image\{color}_king.png"
         self.load_image(image_path)
 
-    def load_image(self, image_path):
-        super().load_image(image_path)
-
     def find_movable_route(self, chessboard):
         super().find_movable_route( chessboard)
         for i in range(3):
@@ -562,9 +621,6 @@ class Queen(Piece):
         super().__init__(color, position, chessboard)
         image_path = f"game\image\{color}_queen.png"
         self.load_image(image_path)
-
-    def load_image(self, image_path):
-        super().load_image(image_path)
 
     def find_movable_route(self, chessboard):
         super().find_movable_route(chessboard)
@@ -590,9 +646,6 @@ class Rook(Piece):
         image_path = f"game\image\{color}_rook.png"
         self.load_image(image_path)
 
-    def load_image(self, image_path):
-        super().load_image(image_path)
-
     def find_movable_route(self, chessboard):
         super().find_movable_route(chessboard)
         directions = [(0, 1), (0, -1), (1, 0), (-1, 0)]
@@ -616,9 +669,6 @@ class Bishop(Piece):
         super().__init__(color, position, chessboard)
         image_path = f"game\image\{color}_bishop.png"
         self.load_image(image_path)
-
-    def load_image(self, image_path):
-        super().load_image(image_path)
 
     def find_movable_route(self, chessboard):
         super().find_movable_route(chessboard)
@@ -644,9 +694,6 @@ class Knight(Piece):
         image_path = f"game\image\{color}_knight.png"
         self.load_image(image_path)
 
-    def load_image(self, image_path):
-        super().load_image(image_path)
-
     def find_movable_route(self, chessboard):
         super().find_movable_route(chessboard)
         directions = [(1, 2), (2, 1), (-1, 2), (-2, 1), (-1, -2), (-2, -1), (1, -2), (2, -1)]
@@ -662,15 +709,13 @@ class Pawn(Piece):
     def __init__(self, color, position, chessboard):
         super().__init__(color, position, chessboard)
         self.first_move = True
+        self.event = False
         image_path = f"game\image\{color}_pawn.png"
         self.load_image(image_path)
 
-    def load_image(self, image_path):
-        super().load_image(image_path)
-
     def find_movable_route(self, chessboard):
         super().find_movable_route(chessboard)
-        if self.color == 'white':
+        if self.color == 'black':
             directions = [(1, 0)] if not self.first_move else [(1, 0), (2, 0)]
             for dx, dy in directions:
                 x = int(self.position[0] + dx)
@@ -683,7 +728,7 @@ class Pawn(Piece):
                     y = int(self.position[1] + dy)
                     if 0 <= x <= 7 and 0 <= y <= 7 and chessboard[(x, y)] and chessboard[(x, y)].color != self.color:
                         self.movable_list[x][y] = True
-        elif self.color == 'black':
+        elif self.color == 'white':
             directions = [(-1, 0)] if not self.first_move else [(-1, 0), (-2, 0)]
             for dx, dy in directions:
                 x = int(self.position[0] + dx)
